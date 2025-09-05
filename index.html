@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Orçamento</title>
+    
+    <link rel="stylesheet" href="style.css">
+
+
+</head>
+<body>
+
+    <div class="container">
+        <h2>Gerador de Orçamento Personalizado</h2>
+        <form id="orcamentoForm">
+
+            <h3>Dados do Cliente</h3>
+            <div class="form-group">
+                <label for="nomeCliente">Nome do Cliente:</label>
+                <input type="text" id="nomeCliente" name="nomeCliente" required>
+            </div>
+            <div class="form-group">
+                <label for="cpfCnpjCliente">CPF/CNPJ do Cliente:</label>
+                <input type="text" id="cpfCnpjCliente" name="cpfCnpjCliente">
+            </div>
+
+            <h3>Descrição do Serviço</h3>
+            <div class="form-group">
+                <label for="descricaoServico">Descrição Detalhada:</label>
+                <textarea id="descricaoServico" name="descricaoServico" rows="6" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="valorTotal">Valor do Orçamento (R$):</label>
+                <input type="number" id="valorTotal" name="valorTotal" step="0.01" required>
+            </div>
+
+            <button type="submit">Gerar PDF do Orçamento</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('orcamentoForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const formData = {
+                nomeCliente: document.getElementById('nomeCliente').value,
+                cpfCnpjCliente: document.getElementById('cpfCnpjCliente').value,
+                descricaoServico: document.getElementById('descricaoServico').value,
+                valorTotal: document.getElementById('valorTotal').value
+            };
+
+            // Envia os dados para o backend
+            fetch('/gerar-orcamento', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                // Cria um link temporário para o download do PDF
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'orcamento.pdf';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => console.error('Erro:', error));
+        });
+    </script>
+
+</body>
+</html>
