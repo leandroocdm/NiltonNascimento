@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, jsonify
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -10,7 +10,7 @@ import datetime
 
 app = Flask(__name__)
 
-# Dados fixos da empresa do seu PDF de exemplo
+# Dados fixos da empresa
 dados_empresa = {
     "nome": "Nilton Nascimento Móveis Planejados",
     "cnpj": "13.744.549/0001-32",
@@ -22,81 +22,86 @@ dados_empresa = {
 
 @app.route('/gerar-orcamento', methods=['POST'])
 def gerar_orcamento():
-    data = request.json
-    nome_cliente = data.get('nomeCliente')
-    cpf_cnpj_cliente = data.get('cpfCnpjCliente')
-    descricao_servico = data.get('descricaoServico')
-    valor_total = float(data.get('valorTotal'))
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Nenhum dado recebido."}), 400
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    styles = getSampleStyleSheet()
-    story = []
+        nome_cliente = data.get('nomeCliente')
+        cpf_cnpj_cliente = data.get('cpfCnpjCliente')
+        descricao_servico = data.get('descricaoServico')
+        valor_total_str = data.get('valorTotal')
 
-    # Estilos de texto
-    styles.add(ParagraphStyle(name='Header', fontSize=12, leading=14, alignment=1))
-    styles.add(ParagraphStyle(name='Body', fontSize=10, leading=12))
+        if not valor_total_str:
+            return jsonify({"error": "Valor do orçamento é obrigatório."}), 400
 
-    # Dados da empresa (cabeçalho)
-    story.append(Paragraph(dados_empresa["nome"], styles['Header']))
-    story.append(Paragraph(f'CNPJ: {dados_empresa["cnpj"]}', styles['Header']))
-    story.append(Paragraph(dados_empresa["endereco"], styles['Header']))
-    story.append(Paragraph(dados_empresa["telefone"], styles['Header']))
-    story.append(Paragraph(dados_empresa["email"], styles['Header']))
-    story.append(Spacer(1, 1*cm))
+        valor_total = float(valor_total_str)
 
-    # Título do documento
-    story.append(Paragraph("<b>ORÇAMENTO</b>", styles['Header']))
-    story.append(Spacer(1, 0.5*cm))
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+        styles = getSampleStyleSheet()
+        story = []
 
-    # Data
-    data_hoje = datetime.datetime.now().strftime("%d/%m/%Y")
-    story.append(Paragraph(f'<b>Data:</b> {data_hoje}', styles['Body']))
-    story.append(Paragraph('Orçamento válido por 7 dias.', styles['Body']))
-    story.append(Spacer(1, 0.5*cm))
+        styles.add(ParagraphStyle(name='Header', fontSize=12, leading=14, alignment=1))
+        styles.add(ParagraphStyle(name='Body', fontSize=10, leading=12))
 
-    # Dados do cliente
-    story.append(Paragraph('<b>CLIENTE:</b>', styles['Body']))
-    story.append(Paragraph(f'<b>NOME:</b> {nome_cliente}', styles['Body']))
-    story.append(Paragraph(f'<b>CPF/CNPJ:</b> {cpf_cnpj_cliente if cpf_cnpj_cliente else "N/A"}', styles['Body']))
-    story.append(Spacer(1, 0.5*cm))
+        # Adiciona o conteúdo ao 'story'
+        story.append(Paragraph(dados_empresa["nome"], styles['Header']))
+        story.append(Paragraph(f'CNPJ: {dados_empresa["cnpj"]}', styles['Header']))
+        story.append(Paragraph(dados_empresa["endereco"], styles['Header']))
+        story.append(Paragraph(dados_empresa["telefone"], styles['Header']))
+        story.append(Paragraph(dados_empresa["email"], styles['Header']))
+        story.append(Spacer(1, 1*cm))
 
-    # Descrição do serviço
-    story.append(Paragraph('<b>DESCRIÇÃO:</b>', styles['Body']))
-    story.append(Paragraph(descricao_servico, styles['Body']))
-    story.append(Spacer(1, 1*cm))
+        story.append(Paragraph("<b>ORÇAMENTO</b>", styles['Header']))
+        story.append(Spacer(1, 0.5*cm))
 
-    # Tabela de formas de pagamento
-    valor_formatado = f"R$ {valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    tabela_pagamento = [
-        ['À VISTA', 'ENTRADA + RESTANTE', 'CARTÃO'],
-        [f'Com desconto incluso\n{valor_formatado}', f'50% de entrada\n• 50% na entrega.\n{valor_formatado}', 'Com taxa à incluir\nEm até 12x']
-    ]
-    
-    style_tabela = TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-    ])
+        data_hoje = datetime.datetime.now().strftime("%d/%m/%Y")
+        story.append(Paragraph(f'<b>Data:</b> {data_hoje}', styles['Body']))
+        story.append(Paragraph('Orçamento válido por 7 dias.', styles['Body']))
+        story.append(Spacer(1, 0.5*cm))
 
-    table = Table(tabela_pagamento, colWidths=[6*cm, 6*cm, 6*cm])
-    table.setStyle(style_tabela)
-    story.append(Paragraph('<b>FORMAS DE PAGAMENTO</b>', styles['Body']))
-    story.append(Spacer(1, 0.2*cm))
-    story.append(table)
-    story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph('<b>CLIENTE:</b>', styles['Body']))
+        story.append(Paragraph(f'<b>NOME:</b> {nome_cliente}', styles['Body']))
+        story.append(Paragraph(f'<b>CPF/CNPJ:</b> {cpf_cnpj_cliente if cpf_cnpj_cliente else "N/A"}', styles['Body']))
+        story.append(Spacer(1, 0.5*cm))
 
-    # Chave Pix
-    story.append(Paragraph(f'<b>Chave Pix:</b> {dados_empresa["pix"]}', styles['Body']))
+        story.append(Paragraph('<b>DESCRIÇÃO:</b>', styles['Body']))
+        story.append(Paragraph(descricao_servico, styles['Body']))
+        story.append(Spacer(1, 1*cm))
 
-    doc.build(story)
-    
-    buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name='orcamento.pdf', mimetype='application/pdf')
+        valor_formatado = f"R$ {valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        tabela_pagamento = [
+            ['À VISTA', 'ENTRADA + RESTANTE', 'CARTÃO'],
+            [f'Com desconto incluso\n{valor_formatado}', f'50% de entrada\n• 50% na entrega.\n{valor_formatado}', 'Com taxa à incluir\nEm até 12x']
+        ]
 
-if __name__ == '__main__':
-    app.run(debug=True)
+        style_tabela = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ])
+
+        table = Table(tabela_pagamento, colWidths=[6*cm, 6*cm, 6*cm])
+        table.setStyle(style_tabela)
+        story.append(Paragraph('<b>FORMAS DE PAGAMENTO</b>', styles['Body']))
+        story.append(Spacer(1, 0.2*cm))
+        story.append(table)
+        story.append(Spacer(1, 0.5*cm))
+
+        story.append(Paragraph(f'<b>Chave Pix:</b> {dados_empresa["pix"]}', styles['Body']))
+        
+        doc.build(story)
+        
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='orcamento.pdf', mimetype='application/pdf')
+
+    except Exception as e:
+        print(f"Ocorreu um erro: {e}")
+        return jsonify({"error": "Ocorreu um erro ao gerar o PDF."}), 500
+
+if __name__
